@@ -50,7 +50,7 @@ export default function Login() {
             >
               <Store size={28} className="text-[#1A1A2E]" />
             </motion.div>
-            <h1 className="font-display text-2xl font-bold text-white">Sharma Kirana</h1>
+            <h1 className="font-display text-2xl font-bold text-white">Grocery Shop</h1>
             <p className="mt-1 text-sm text-white/60">Sign in to your account</p>
           </div>
 
@@ -120,18 +120,6 @@ export default function Login() {
               )}
             </motion.button>
           </form>
-
-          <div className="mt-8 rounded-xl border border-white/10 bg-white/5 p-4">
-            <p className="text-center text-xs font-medium text-white/40">Demo Credentials</p>
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-white/60">Email:</span>
-              <span className="font-mono text-white/80">admin@sharmakirana.com</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-sm">
-              <span className="text-white/60">Password:</span>
-              <span className="font-mono text-white/80">admin123</span>
-            </div>
-          </div>
         </div>
 
         <p className="mt-6 text-center text-xs text-white/40">
