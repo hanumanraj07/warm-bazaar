@@ -94,8 +94,8 @@ const initializeApp = async () => {
   initPromise = (async () => {
     await connectDB()
 
-    const adminExists = await User.findOne({ email: config.admin.email })
-    if (!adminExists) {
+    const adminUser = await User.findOne({ email: config.admin.email }).select('+password')
+    if (!adminUser) {
       await User.create({
         name: 'Admin',
         email: config.admin.email,
@@ -103,7 +103,15 @@ const initializeApp = async () => {
         role: 'ADMIN',
       })
       console.log('Admin user created:', config.admin.email)
+      return
     }
+
+    // Keep default admin credentials in sync with env for predictable first login.
+    adminUser.name = adminUser.name || 'Admin'
+    adminUser.role = 'ADMIN'
+    adminUser.isActive = true
+    adminUser.password = config.admin.password
+    await adminUser.save()
   })()
 
   return initPromise
