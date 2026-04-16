@@ -15,10 +15,13 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
+const isVercel = Boolean(process.env.VERCEL)
+let initPromise = null
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }))
+
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -32,7 +35,7 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true)
       } else {
@@ -46,16 +49,20 @@ app.use(
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
-app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*')
-  res.header('Cross-Origin-Resource-Policy', 'cross-origin')
-  next()
-}, express.static(path.join(__dirname, 'uploads'), {
-  setHeaders: (res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*')
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin')
+    next()
   },
-}))
+  express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    },
+  })
+)
 
 if (config.nodeEnv === 'development') {
   app.use(morgan('dev'))
@@ -72,15 +79,10 @@ const limiter = rateLimit({
   legacyHeaders: false,
 })
 
-app.use('/api', limiter)
+const initializeApp = async () => {
+  if (initPromise) return initPromise
 
-app.use('/api', routes)
-
-app.use(notFound)
-app.use(errorHandler)
-
-const startServer = async () => {
-  try {
+  initPromise = (async () => {
     await connectDB()
 
     const adminExists = await User.findOne({ email: config.admin.email })
@@ -91,36 +93,41 @@ const startServer = async () => {
         password: config.admin.password,
         role: 'ADMIN',
       })
-      console.log('✓ Admin user created:', config.admin.email)
+      console.log('Admin user created:', config.admin.email)
     }
+  })()
 
-    app.listen(config.port, () => {
-      console.log(`
-╔════════════════════════════════════════════════════════════╗
-║                                                            ║
-║   🏪 Grocery Shop Management API                            ║
-║                                                            ║
-║   Server running on port ${config.port}                         
-║   Environment: ${config.nodeEnv}                              
-║   API Base URL: http://localhost:${config.port}/api            
-║                                                            ║
-║   Endpoints:                                               ║
-║   • POST   /api/auth/login                                 ║
-║   • GET    /api/products                                   ║
-║   • GET    /api/customers                                 ║
-║   • GET    /api/suppliers                                 ║
-║   • GET    /api/bills                                     ║
-║   • GET    /api/purchases                                 ║
-║   • GET    /api/expenses                                  ║
-║   • GET    /api/dashboard/summary                         ║
-║                                                            ║
-╚════════════════════════════════════════════════════════════╝
-      `)
-    })
-  } catch (error) {
-    console.error('Failed to start server:', error)
-    process.exit(1)
-  }
+  return initPromise
 }
 
-startServer()
+app.use('/api', limiter)
+app.use('/api', async (req, res, next) => {
+  try {
+    await initializeApp()
+    next()
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.use('/api', routes)
+app.use(notFound)
+app.use(errorHandler)
+
+if (!isVercel) {
+  const startServer = async () => {
+    try {
+      await initializeApp()
+      app.listen(config.port, () => {
+        console.log(`API server running on port ${config.port} (${config.nodeEnv})`)
+      })
+    } catch (error) {
+      console.error('Failed to start server:', error)
+      process.exit(1)
+    }
+  }
+
+  startServer()
+}
+
+export default app
