@@ -18,11 +18,14 @@ const app = express()
 const isVercel = Boolean(process.env.VERCEL)
 let initPromise = null
 
+const normalizeOrigin = (origin = '') => origin.trim().replace(/\/+$/, '')
+const vercelProjectOriginPattern = /^https:\/\/warm-bazaar(?:-[a-z0-9-]+)?\.vercel\.app$/i
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }))
 
-const allowedOrigins = [
+const allowedOrigins = new Set([
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
@@ -30,16 +33,22 @@ const allowedOrigins = [
   'http://localhost:5177',
   'http://localhost:5178',
   'http://localhost:5179',
-  config.frontendUrl,
-]
+  normalizeOrigin(config.frontendUrl),
+])
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin)
+      const isAllowed =
+        !normalizedOrigin ||
+        allowedOrigins.has(normalizedOrigin) ||
+        vercelProjectOriginPattern.test(normalizedOrigin)
+
+      if (isAllowed) {
         callback(null, true)
       } else {
-        callback(new Error('Not allowed by CORS'))
+        callback(new Error(`Not allowed by CORS: ${normalizedOrigin}`))
       }
     },
     credentials: true,
