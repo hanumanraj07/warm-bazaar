@@ -1,7 +1,35 @@
 import axios from 'axios'
 
+const trimTrailingSlash = (value) => value.replace(/\/+$/, '')
+
+const normalizeApiBaseUrl = (value) => {
+  const raw = trimTrailingSlash(value || '')
+  if (!raw) return raw
+
+  // On Vercel multi-service deploys, backend is mounted under /_/backend.
+  // If env accidentally points to same-origin /api, rewrite to the correct route.
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    if (raw === '/api') return '/_/backend/api'
+    try {
+      const parsed = new URL(raw, window.location.origin)
+      if (
+        parsed.origin === window.location.origin &&
+        trimTrailingSlash(parsed.pathname) === '/api'
+      ) {
+        return '/_/backend/api'
+      }
+    } catch {
+      // Ignore invalid URL and keep original value.
+    }
+  }
+
+  return raw
+}
+
 const getDefaultApiBaseUrl = () => {
-  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL)
+  }
   if (import.meta.env.PROD) return '/_/backend/api'
   return 'http://localhost:4000/api'
 }
